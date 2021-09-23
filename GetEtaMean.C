@@ -1,13 +1,13 @@
 int GetEtaMean() {
 
-    const double minPt = 4;
-    const double maxPt = 7;
+    const double minPt = 2;
+    const double maxPt = 1000000000;
 
     const double bgIntegrationLowEdge = 0.3;
     const double bgIntegrationUpEdge = 0.4;
 
     const double massLowEdge = 0.3;
-    const double massUpEdge = 0.9;
+    const double massUpEdge = 0.7;
     
     TFile *infile  = new TFile("temp/CombinedCabanaBoy.root", "read");
     TFile *outfile = new TFile("temp/EtaPeakOut.root", "recreate");
@@ -54,38 +54,42 @@ int GetEtaMean() {
 
             for (int ptBin = pTMinBin; ptBin < pTMaxBin; ptBin++) {
 
-                sprintf(name, "massHistFG_pt%f_cent%d_sec%d", massHistFG->GetZaxis()->GetBinLowEdge(ptBin), cent, sec);
+                sprintf(name, "massHistFG_pt%f_cent%d_sec%d", massHistFG->GetZaxis()->GetBinCenter(ptBin), cent, sec);
                 massSpectrumFG = massHistFG->ProjectionX(name, sec, sec, ptBin, ptBin);
 
-                sprintf(name, "massHistBG_pt%f_cent%d_sec%d", massHistBG->GetZaxis()->GetBinLowEdge(ptBin), cent, sec);
+                sprintf(name, "massHistBG_pt%f_cent%d_sec%d", massHistBG->GetZaxis()->GetBinCenter(ptBin), cent, sec);
                 massSpectrumBG = massHistBG->ProjectionX(name, sec, sec, ptBin, ptBin);
 
                 const double scalingFactor = massSpectrumFG->Integral(bgIntegrationMinBin, bgIntegrationMaxBin) /
                                              massSpectrumBG->Integral(bgIntegrationMinBin, bgIntegrationMaxBin) ;
 
 
-                cout << "INTEGRAL 1: " << massSpectrumFG->Integral(bgIntegrationMinBin, bgIntegrationMaxBin) << endl;
-                cout << "INTEGRAL 2: " << massSpectrumBG->Integral(bgIntegrationMinBin, bgIntegrationMaxBin) << endl;
-
-                cout << scalingFactor << endl;
-
                 massSpectrumBG->Scale( scalingFactor );
                 
-                sprintf(name, "etaPeak_pt%f_cent%d_sec%d", massSpectrumFG->GetZaxis()->GetBinLowEdge(ptBin), cent, sec);
+                sprintf(name, "etaPeak_pt%f_cent%d_sec%d", massHistFG->GetZaxis()->GetBinCenter(ptBin), cent, sec);
                 etaPeak = (TH1D*) massSpectrumFG->Clone(name);
 
                 etaPeak->Add(massSpectrumBG, -1);
 
-                sprintf(name, "fit__pt%f_cent%d_sec%d", massSpectrumFG->GetZaxis()->GetBinLowEdge(ptBin), cent, sec);
+                sprintf(name, "fit__pt%f_cent%d_sec%d", massHistFG->GetZaxis()->GetBinCenter(ptBin), cent, sec);
                 fit = new TF1(name, "gaus(0) + pol2(3)", massLowEdge, massUpEdge); 
-                fit->SetParameters(2000, 0.547, 0.1, 0, 0, 0);
+                fit->SetParameters(800, 0.55, 0.02, 0, 0, 0);
                 etaPeak->Fit(fit, "RQ");
 
+                outtxtfile << std::setw(10) << std::setprecision(5) << massHistFG->GetZaxis()->GetBinCenter(ptBin) 
+                           << std::setw(10) << std::setprecision(5) << cent
+                           << std::setw(10) << std::setprecision(5) << sec
+                           << std::setw(15) << std::setprecision(5) << fit->GetParameter(1)
+                           << std::setw(15) << std::setprecision(5) << fit->GetParError(1)
+                           << std::setw(15) << std::setprecision(5) << fit->GetParameter(2)
+                           << std::setw(15) << std::setprecision(5) << fit->GetParError(2) << std::endl;
+
+                    
                 outfile->mkdir(dir.c_str());
                 outfile->cd(dir.c_str());
 
-                massSpectrumFG->Write();
-                massSpectrumBG->Write();
+                //massSpectrumFG->Write();
+                //massSpectrumBG->Write();
                 etaPeak   ->Write();
 
                 outfile->cd();
